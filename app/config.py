@@ -1,0 +1,25 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    google_api_key: str
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/myrag"
+    )
+
+    # Vector store
+    collection_name: str = "documents"
+    vector_size: int = 768  # text-embedding-004
+
+    # Chunking
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+
+    # Models
+    embedding_model: str = "models/text-embedding-004"
+    llm_model: str = "gemini-2.0-flash"
+
+
+settings = Settings()
