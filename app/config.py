@@ -19,7 +19,11 @@ class Settings(BaseSettings):
 
     # Models
     embedding_model: str = "models/text-embedding-004"
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-3.1-flash-lite"
+    llm_temperature: float = 0.0
+
+    # Retrieval
+    compression_similarity_threshold: float = 0.3
 
 
 settings = Settings()

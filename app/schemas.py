@@ -6,6 +6,16 @@ class IngestResponse(BaseModel):
     message: str
 
 
+class GdriveIngestRequest(BaseModel):
+    access_token: str
+
+
+class GdriveIngestResponse(BaseModel):
+    chunk_count: int
+    files: list[str]
+    message: str
+
+
 class QueryRequest(BaseModel):
     question: str
     k: int = 4
