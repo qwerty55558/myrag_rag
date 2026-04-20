@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from fastapi import UploadFile
+if TYPE_CHECKING:
+    from fastapi import UploadFile
+
 from langchain_community.document_loaders import (
     PyPDFLoader,
     TextLoader,

@@ -37,6 +37,7 @@ async def init_resources() -> None:
     await engine.ainit_vectorstore_table(
         table_name=settings.collection_name,
         vector_size=settings.vector_size,
+        schema_name=settings.db_schema,
         overwrite_existing=False,
     )
 
@@ -44,6 +45,7 @@ async def init_resources() -> None:
         engine=engine,
         embedding_service=get_embeddings(),
         table_name=settings.collection_name,
+        schema_name=settings.db_schema,
     )
 
     index = HNSWIndex(m=16, ef_construction=64)

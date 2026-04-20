@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     )
 
     # Vector store
+    db_schema: str = "rag"
     collection_name: str = "documents"
     vector_size: int = 768  # text-embedding-004
 
@@ -24,6 +25,9 @@ class Settings(BaseSettings):
 
     # Retrieval
     compression_similarity_threshold: float = 0.3
+
+    # gRPC
+    grpc_port: int = 50051
 
 
 settings = Settings()
