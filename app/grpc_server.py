@@ -5,11 +5,11 @@ import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 
-import app.proto  # noqa: F401  — sys.path 보정
+import rag_pb2
+import rag_pb2_grpc
 from app.config import settings
 from app.dependencies import init_resources
 from app.grpc_handlers import RagServiceServicer
-from app.proto import rag_pb2, rag_pb2_grpc
 
 logging.basicConfig(
     level=logging.INFO,
