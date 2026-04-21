@@ -10,7 +10,11 @@ from app.config import settings
 # -- Singletons (initialized in lifespan) --
 
 engine: PGEngine | None = None
-vector_store: PGVectorStore | None = None
+_user_stores: dict[str, PGVectorStore] = {}
+
+
+def _user_table_name(user_id: str) -> str:
+    return f"documents_{user_id}"
 
 
 def get_embeddings() -> GoogleGenerativeAIEmbeddings:
@@ -20,44 +24,54 @@ def get_embeddings() -> GoogleGenerativeAIEmbeddings:
     )
 
 
-def get_llm() -> ChatGoogleGenerativeAI:
+def get_llm(model: str | None = None) -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model=settings.llm_model,
+        model=model or settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=settings.llm_temperature,
     )
 
 
 async def init_resources() -> None:
-    """Called once at startup via FastAPI lifespan."""
-    global engine, vector_store
-
+    """Called once at startup — DB 엔진 초기화."""
+    global engine
     engine = PGEngine.from_connection_string(settings.database_url)
 
-    await engine.ainit_vectorstore_table(
-        table_name=settings.collection_name,
-        vector_size=settings.vector_size,
-        schema_name=settings.db_schema,
-        overwrite_existing=False,
-    )
 
-    vector_store = await PGVectorStore.create(
+async def get_user_vector_store(user_id: str) -> PGVectorStore:
+    """유저별 벡터 테이블을 생성/반환한다."""
+    if user_id in _user_stores:
+        return _user_stores[user_id]
+
+    assert engine is not None, "Engine not initialized"
+
+    table_name = _user_table_name(user_id)
+
+    try:
+        await engine.ainit_vectorstore_table(
+            table_name=table_name,
+            vector_size=settings.vector_size,
+            schema_name=settings.db_schema,
+            overwrite_existing=False,
+        )
+    except Exception:
+        pass  # table already exists
+
+    store = await PGVectorStore.create(
         engine=engine,
         embedding_service=get_embeddings(),
-        table_name=settings.collection_name,
+        table_name=table_name,
         schema_name=settings.db_schema,
     )
 
     index = HNSWIndex(m=16, ef_construction=64)
     try:
-        await vector_store.aapply_vector_index(index)
+        await store.aapply_vector_index(index)
     except Exception:
         pass  # index already exists
 
-
-def get_vector_store() -> PGVectorStore:
-    assert vector_store is not None, "Vector store not initialized"
-    return vector_store
+    _user_stores[user_id] = store
+    return store
 
 
 def get_compression_retriever(base_retriever: RetrieverLike) -> ContextualCompressionRetriever:
