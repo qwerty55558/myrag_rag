@@ -21,3 +21,7 @@ src/generated/rag/v1/*_pb2*.py
 
 # OS
 .DS_Store
+
+# claude
+#.claude/
+
