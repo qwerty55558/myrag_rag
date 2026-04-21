@@ -1,7 +1,8 @@
-FROM --platform=linux/amd64 python:3.13-slim
+FROM python:3.13-slim
 
-# 시스템 의존성: Tesseract OCR + 한국어 언어팩 + poppler (pdf2image)
+# 시스템 의존성: git (proto 패키지 설치) + Tesseract OCR + 한국어 언어팩
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     tesseract-ocr \
     tesseract-ocr-kor \
     libgl1 \
