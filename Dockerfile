@@ -13,6 +13,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
+# GitHub private repo 접근용 (빌드 시에만 사용, 최종 이미지에 남지 않음)
+ARG GITHUB_TOKEN
+RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+
 # 의존성 설치
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
