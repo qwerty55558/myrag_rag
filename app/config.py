@@ -30,9 +30,10 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
 
     # Retrieval
-    retrieval_k: int = 8
+    retrieval_probe_k: int = 4
+    retrieval_total_budget: int = 20
+    retrieval_min_per_source: int = 3
     compression_similarity_threshold: float = 0.3
-    source_similarity_threshold: float = 0.3
 
     # gRPC
     grpc_port: int = 50051

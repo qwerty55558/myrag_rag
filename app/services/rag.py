@@ -3,18 +3,13 @@ import time
 from collections.abc import AsyncGenerator
 
 from google.genai.errors import ClientError, ServerError
+from langchain_classic.retrievers.document_compressors import EmbeddingsFilter
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.config import settings
-from app.dependencies import (
-    filter_sources_by_query,
-    get_compression_retriever,
-    get_llm,
-    get_user_sources,
-    get_user_vector_store,
-)
+from app.dependencies import get_embeddings, get_llm, get_user_vector_store, weighted_retrieval
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +78,6 @@ async def _generate_summary(
 async def stream_query(
     question: str,
     user_id: str,
-    k: int | None = None,
     current_timestamp: str = "",
     context_summary: str = "",
 ) -> AsyncGenerator[tuple[str, bool, list[Document], str], None]:
@@ -93,26 +87,18 @@ async def stream_query(
         (token, is_final, docs, context_summary)
         — 마지막 청크에서 is_final=True, docs에 소스 문서, context_summary에 갱신된 요약 포함.
     """
-    k = k or settings.retrieval_k
     store = await get_user_vector_store(user_id)
 
     t0 = time.perf_counter()
-    # 문서가 있을 때만 검색 수행
     try:
-        sources = await get_user_sources(user_id)
-        relevant_sources = await filter_sources_by_query(question, sources)
-
-        search_kwargs: dict = {"k": k}
-        if relevant_sources:
-            if len(relevant_sources) == 1:
-                search_kwargs["filter"] = {"source": relevant_sources[0]}
-            else:
-                search_kwargs["filter"] = {"source": {"$in": relevant_sources}}
-            logger.info("Source filter applied: %s", relevant_sources)
-
-        base_retriever = store.as_retriever(search_kwargs=search_kwargs)
-        retriever = get_compression_retriever(base_retriever)
-        docs = await retriever.ainvoke(question)
+        raw_docs = await weighted_retrieval(store, question)
+        # EmbeddingsFilter로 최종 관련성 필터링
+        compressor = EmbeddingsFilter(
+            embeddings=get_embeddings(),
+            similarity_threshold=settings.compression_similarity_threshold,
+        )
+        docs = await compressor.acompress_documents(raw_docs, question)
+        docs = list(docs)
     except Exception:
         logger.exception("Retrieval failed")
         docs = []

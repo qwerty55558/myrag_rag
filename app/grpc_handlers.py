@@ -27,13 +27,10 @@ class RagServiceServicer(rag_pb2_grpc.RagServiceServicer):
         if request.HasField("current_timestamp"):
             current_timestamp = request.current_timestamp.ToDatetime().isoformat()
 
-        k = request.k if request.k > 0 else None
-
         try:
             async for token, is_final, docs, new_summary in stream_query(
                 question=request.query,
                 user_id=request.user_id,
-                k=k,
                 current_timestamp=current_timestamp,
                 context_summary=request.context_summary,
             ):
