@@ -840,8 +840,8 @@ wheels = [
 
 [[package]]
 name = "myrag-proto"
-version = "1.0.2"
-source = { git = "https://github.com/qwerty55558/myrag_proto.git#fdce1135b940c04f57318b05d9c48dbf4079d21c" }
+version = "1.0.10"
+source = { git = "https://github.com/qwerty55558/myrag_proto.git#7cc5bbdd1d4edea8dd0dec4c812b28ffd90cdab9" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
