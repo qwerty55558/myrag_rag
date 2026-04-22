@@ -1,12 +1,9 @@
-import math
+from collections import Counter
 
-from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain_classic.retrievers.document_compressors import EmbeddingsFilter
-from langchain_core.retrievers import RetrieverLike
+from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_postgres import PGEngine, PGVectorStore
 from langchain_postgres.v2.indexes import HNSWIndex
-from sqlalchemy import text
 
 from app.config import settings
 
@@ -77,60 +74,55 @@ async def get_user_vector_store(user_id: str) -> PGVectorStore:
     return store
 
 
-async def get_user_sources(user_id: str) -> list[str]:
-    """유저의 벡터 스토어에 저장된 고유 소스(파일명) 목록을 반환한다."""
-    assert engine is not None
-    table = _user_table_name(user_id)
-    schema = settings.db_schema
-    query = text(
-        f'SELECT DISTINCT cmetadata->>\'source\' FROM "{schema}"."{table}"'
-    )
-    async with engine._pool.connect() as conn:
-        result = await conn.execute(query)
-        return [row[0] for row in result if row[0]]
-
-
-async def filter_sources_by_query(
+async def weighted_retrieval(
+    store: PGVectorStore,
     question: str,
-    sources: list[str],
-    threshold: float | None = None,
-) -> list[str] | None:
-    """질문과 소스 파일명 간 임베딩 유사도를 비교해 관련 소스만 반환한다.
+) -> list[Document]:
+    """1차 프로브로 소스 관련도를 측정한 뒤, 가중치 기반으로 소스별 청크를 수집한다."""
+    probe_k = settings.retrieval_probe_k
+    total_budget = settings.retrieval_total_budget
+    min_per_source = settings.retrieval_min_per_source
 
-    모든 소스가 임계값 이하이면 None을 반환하여 필터 없이 검색하도록 한다.
-    """
-    if not sources or len(sources) <= 1:
-        return None
+    # 1차: 전체 대상 프로브 검색
+    probe_docs = await store.asimilarity_search(question, k=probe_k)
 
-    threshold = threshold or settings.source_similarity_threshold
-    embeddings = get_embeddings()
-    query_emb = await embeddings.aembed_query(question)
-    source_embs = await embeddings.aembed_documents(sources)
+    if not probe_docs:
+        return []
 
-    scores = []
-    for emb in source_embs:
-        dot = sum(a * b for a, b in zip(query_emb, emb))
-        norm_q = math.sqrt(sum(a * a for a in query_emb))
-        norm_s = math.sqrt(sum(b * b for b in emb))
-        cos_sim = dot / (norm_q * norm_s + 1e-10)
-        scores.append(cos_sim)
-
-    max_score = max(scores)
-    if max_score < threshold:
-        return None
-
-    # 최고 점수 대비 90% 이상인 소스만 선택
-    cutoff = max_score * 0.9
-    relevant = [src for src, sc in zip(sources, scores) if sc >= cutoff]
-    return relevant if len(relevant) < len(sources) else None
-
-
-def get_compression_retriever(base_retriever: RetrieverLike) -> ContextualCompressionRetriever:
-    compressor = EmbeddingsFilter(
-        embeddings=get_embeddings(),
-        similarity_threshold=settings.compression_similarity_threshold,
+    # 소스별 출현 횟수로 가중치 계산
+    source_counts = Counter(
+        doc.metadata.get("source", "unknown") for doc in probe_docs
     )
-    return ContextualCompressionRetriever(
-        base_compressor=compressor,
-        base_retriever=base_retriever,
-    )
+    all_sources = list(source_counts.keys())
+
+    if len(all_sources) <= 1:
+        # 소스가 1개면 그냥 전체 budget으로 검색
+        return await store.asimilarity_search(question, k=total_budget)
+
+    # 가중치 기반 k 할당: 최소 보장 + 나머지 비례 배분
+    total_hits = sum(source_counts.values())
+    reserved = min_per_source * len(all_sources)
+    remaining = max(0, total_budget - reserved)
+
+    k_per_source: dict[str, int] = {}
+    for src in all_sources:
+        weight = source_counts[src] / total_hits
+        k_per_source[src] = min_per_source + round(remaining * weight)
+
+    # 2차: 소스별 필터 검색
+    all_docs: list[Document] = []
+    seen_ids: set[str] = set()
+
+    for src, k in k_per_source.items():
+        src_docs = await store.asimilarity_search(
+            question, k=k, filter={"source": src},
+        )
+        for doc in src_docs:
+            doc_id = f"{doc.metadata.get('source')}:{doc.page_content[:80]}"
+            if doc_id not in seen_ids:
+                seen_ids.add(doc_id)
+                all_docs.append(doc)
+
+    return all_docs
+
+
