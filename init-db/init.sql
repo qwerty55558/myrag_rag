@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS rag;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rag_user') THEN
-        CREATE ROLE rag_user WITH LOGIN PASSWORD '__RAG_DB_PASSWORD__';
+        CREATE ROLE rag_user WITH LOGIN PASSWORD 'changeme';
     END IF;
 END
 $$;
@@ -21,7 +21,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA rag GRANT ALL ON SEQUENCES TO rag_user;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_spring') THEN
-        CREATE ROLE app_spring WITH LOGIN PASSWORD '__DB_SPRING_PW__';
+        CREATE ROLE app_spring WITH LOGIN PASSWORD 'spring_pw';
     END IF;
 END
 $$;
