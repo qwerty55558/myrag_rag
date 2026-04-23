@@ -2,7 +2,9 @@ import logging
 from datetime import datetime, timezone
 
 import grpc
+from asyncpg.exceptions import UndefinedTableError
 from google.protobuf.timestamp_pb2 import Timestamp
+from sqlalchemy.exc import ProgrammingError
 
 import rag_pb2
 import rag_pb2_grpc
@@ -122,7 +124,10 @@ class RagServiceServicer(rag_pb2_grpc.RagServiceServicer):
                     )
                     return result.fetchall()
 
-            rows = await deps.engine._run_as_async(_query())
+            try:
+                rows = await deps.engine._run_as_async(_query())
+            except (ProgrammingError, UndefinedTableError):
+                return rag_pb2.ListDocumentsResponse(documents=[])
 
             documents = []
             for row in rows:
@@ -173,7 +178,13 @@ class RagServiceServicer(rag_pb2_grpc.RagServiceServicer):
                     await conn.commit()
                     return result.rowcount
 
-            deleted = await deps.engine._run_as_async(_delete())
+            try:
+                deleted = await deps.engine._run_as_async(_delete())
+            except (ProgrammingError, UndefinedTableError):
+                return rag_pb2.DeleteDocumentsResponse(
+                    deleted_count=0,
+                    message="인덱싱된 문서가 없습니다.",
+                )
 
             return rag_pb2.DeleteDocumentsResponse(
                 deleted_count=deleted,
