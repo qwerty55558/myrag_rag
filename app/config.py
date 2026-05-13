@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Models
     embedding_model: str = "models/gemini-embedding-2-preview"
-    llm_model: str = "gemini-3.1-flash-lite-preview"
+    llm_model: str = "gemini-3.1-flash-lite"
     llm_fallback_models: list[str] = [
         "gemini-3-flash-preview",
         "gemini-2.5-flash",
