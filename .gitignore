@@ -14,7 +14,6 @@ venv/
 .vscode/
 
 # Environment
-.env
 
 # Generated proto
 src/generated/rag/v1/*_pb2*.py
@@ -24,4 +23,8 @@ src/generated/rag/v1/*_pb2*.py
 
 # claude
 #.claude/
-
+# Environment files (auto-managed)
+.env
+.env.*
+!.env.example
+!.env.sample
